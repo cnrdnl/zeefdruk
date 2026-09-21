@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Zeefdruk Bitmap Tool</title>
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --panel: #262626;
+    --border: #3a3a3a;
+    --text: #eee;
+    --accent: #e63946;
+    --muted: #999;
+    --checker: #333;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin:0; font-size: 18px; font-weight: 600; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .layout {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    flex-wrap: wrap;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    width: 300px;
+    flex-shrink: 0;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .group { margin-bottom: 18px; }
+  .group:last-child { margin-bottom: 0; }
+  label.field {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  input[type=range] { width: 100%; }
+  select, input[type=text] {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #1a1a1a;
+    color: var(--text);
+    font-size: 13px;
+  }
+  select:focus, input[type=text]:focus {
+    outline: 1px solid var(--accent);
+  }
+  .num-suffix {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  input[type=number] {
+    width: 52px;
+    padding: 3px 5px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #1a1a1a;
+    color: var(--text);
+    font-size: 13px;
+    text-align: right;
+  }
+  input[type=number]:focus {
+    outline: 1px solid var(--accent);
+  }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+  }
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider-toggle {
+    position: absolute; cursor:pointer; inset:0;
+    background: #444; border-radius: 24px; transition: .15s;
+  }
+  .slider-toggle:before {
+    content:""; position:absolute; height:18px; width:18px; left:3px; top:3px;
+    background:white; border-radius:50%; transition:.15s;
+  }
+  input:checked + .slider-toggle { background: var(--accent); }
+  input:checked + .slider-toggle:before { transform: translateX(18px); }
+  fieldset {
+    border: none; padding:0; margin:0;
+  }
+  fieldset[disabled] { opacity: .4; pointer-events: none; }
+  button {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #333;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  button:not(:disabled):hover { filter: brightness(1.1); }
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  .dropzone.drag { border-color: var(--accent); color: var(--text); }
+  .canvases {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .canvas-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    flex: 1;
+    min-width: 320px;
+  }
+  .canvas-box h3 {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .canvas-wrap {
+    position: relative;
+    background:
+      linear-gradient(45deg, var(--checker) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--checker) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--checker) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--checker) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+  }
+  canvas { max-width: 100%; display: block; }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .empty {
+    color: #888;
+    font-size: 13px;
+    padding: 40px 20px;
+    text-align: center;
+    position: absolute;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Zeefdruk Bitmap Tool</h1>
+  <p>Importeer een foto &rarr; stel zwart-wit in &rarr; posteriseer naar rasterdots &rarr; exporteer als transparante PNG</p>
+</header>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Weergave</h2>
+    <div class="group">
+      <label class="field"><span>Schaakbord zichtbaarheid</span><span id="checkerVisVal">70</span></label>
+      <input type="range" id="checkerVis" min="0" max="100" value="70">
+      <div class="hint">Alleen voor de weergave op je scherm &mdash; heeft geen effect op de gedownloade PNG.</div>
+    </div>
+
+    <h2 style="margin-top:20px;">1. Afbeelding</h2>
+    <div class="dropzone" id="dropzone">
+      Klik om een afbeelding te kiezen<br>of sleep 'm hierheen
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+
+    <div class="group" style="margin-top:20px;">
+      <div class="toggle-row">
+        <span>Zwart-wit</span>
+        <label class="switch">
+          <input type="checkbox" id="bwToggle">
+          <span class="slider-toggle"></span>
+        </label>
+      </div>
+    </div>
+
+    <fieldset id="bwFieldset" disabled>
+      <h2>2. Zwart-wit instellingen</h2>
+      <div class="group">
+        <label class="field"><span>Helderheid</span><span id="brightnessVal">0</span></label>
+        <input type="range" id="brightness" min="-100" max="100" value="0">
+      </div>
+      <div class="group">
+        <label class="field"><span>Contrast</span><span id="contrastVal">0</span></label>
+        <input type="range" id="contrast" min="-100" max="100" value="0">
+      </div>
+      <div class="group">
+        <label class="field"><span>Drempelwaarde (zwartpunt)</span><span id="thresholdVal">0</span></label>
+        <input type="range" id="threshold" min="0" max="240" value="0">
+        <div class="hint">Alles onder deze waarde wordt puur zwart; de rest van de tinten wordt daarop uitgerekt. Hoger = meer zwart in beeld.</div>
+      </div>
+    </fieldset>
+
+    <fieldset id="posterFieldset" disabled style="margin-top:20px;">
+      <h2>3. Posterize &rarr; rasterdots</h2>
+      <div class="group">
+        <label class="field"><span>Aantal tinten</span><span id="levelsVal">4</span></label>
+        <input type="range" id="levels" min="2" max="16" value="4">
+        <div class="hint">Aantal grijstinten waarnaar wordt teruggebracht vóór het rasteren.</div>
+      </div>
+      <div class="group">
+        <label class="field"><span>Dot grootte</span><span id="dotSizeVal">10</span></label>
+        <input type="range" id="dotSize" min="3" max="40" value="10">
+        <div class="hint">Grootte van het rastercel in pixels. Kleiner = fijner dotpatroon.</div>
+      </div>
+      <div class="group">
+        <label class="field"><span>Rasterhoek</span>
+          <span class="num-suffix"><input type="number" id="angleVal" min="0" max="180" step="0.5" value="0">&deg;</span>
+        </label>
+        <input type="range" id="angle" min="0" max="180" step="0.5" value="0">
+        <div class="hint">Draait het dotraster. Klassieke zeefdrukrasters gebruiken vaak 22,5&deg; of 45&deg; om Moir&eacute;-patronen te verminderen.</div>
+      </div>
+      <div class="group">
+        <div class="toggle-row">
+          <span>Scherpe dots</span>
+          <label class="switch">
+            <input type="checkbox" id="sharpDots" checked>
+            <span class="slider-toggle"></span>
+          </label>
+        </div>
+        <div class="hint">Elke dot wordt volledig zwart of volledig transparant getekend, zonder vervaagde randen &mdash; ideaal voor het belichten van een zeefdrukscherm. Uitzetten geeft zachtere, geantialiaste randen.</div>
+      </div>
+    </fieldset>
+
+    <div class="group" style="margin-top:20px;">
+      <h2>4. Presets</h2>
+      <select id="presetSelect">
+        <option value="">&mdash; Kies preset &mdash;</option>
+      </select>
+      <div style="height:8px;"></div>
+      <input type="text" id="presetName" placeholder="Naam voor nieuwe preset...">
+      <div style="height:8px;"></div>
+      <button id="savePresetBtn">Opslaan als preset</button>
+      <div style="height:8px;"></div>
+      <button id="deletePresetBtn" disabled>Verwijder geselecteerde preset</button>
+      <div class="hint">Presets bevatten alle zwart-wit- en posterize-instellingen (niet de afbeelding zelf) en blijven bewaard op deze computer.</div>
+    </div>
+
+    <div class="group" style="margin-top:20px;">
+      <button class="primary" id="downloadBtn" disabled>Download als PNG</button>
+      <div style="height:8px;"></div>
+      <button id="resetBtn" disabled>Instellingen resetten</button>
+    </div>
+  </div>
+
+  <div class="canvases">
+    <div class="canvas-box">
+      <h3>Origineel</h3>
+      <div class="canvas-wrap">
+        <canvas id="originalCanvas"></canvas>
+        <div class="empty" id="originalEmpty">Nog geen afbeelding geladen</div>
+      </div>
+    </div>
+    <div class="canvas-box">
+      <h3>Resultaat</h3>
+      <div class="canvas-wrap">
+        <canvas id="resultCanvas"></canvas>
+        <div class="empty" id="resultEmpty">Nog geen afbeelding geladen</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MAX_DIM = 1600;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const originalCanvas = document.getElementById('originalCanvas');
+  const originalEmpty = document.getElementById('originalEmpty');
+  const resultCanvas = document.getElementById('resultCanvas');
+  const resultEmpty = document.getElementById('resultEmpty');
+  const bwToggle = document.getElementById('bwToggle');
+  const bwFieldset = document.getElementById('bwFieldset');
+  const posterFieldset = document.getElementById('posterFieldset');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const sharpDots = document.getElementById('sharpDots');
+  sharpDots.addEventListener('change', scheduleProcess);
+
+  const controls = {
+    brightness: document.getElementById('brightness'),
+    contrast: document.getElementById('contrast'),
+    threshold: document.getElementById('threshold'),
+    levels: document.getElementById('levels'),
+    dotSize: document.getElementById('dotSize'),
+    angle: document.getElementById('angle'),
+  };
+  const labels = {
+    brightness: document.getElementById('brightnessVal'),
+    contrast: document.getElementById('contrastVal'),
+    threshold: document.getElementById('thresholdVal'),
+    levels: document.getElementById('levelsVal'),
+    dotSize: document.getElementById('dotSizeVal'),
+    angle: document.getElementById('angleVal'),
+  };
+  const defaults = { brightness:0, contrast:0, threshold:0, levels:4, dotSize:10, angle:0 };
+
+  function setLabelValue(key, value) {
+    const el = labels[key];
+    if (!el) return;
+    if (el.tagName === 'INPUT') el.value = value;
+    else el.textContent = value;
+  }
+
+  const checkerVis = document.getElementById('checkerVis');
+  const checkerVisVal = document.getElementById('checkerVisVal');
+  function applyCheckerVisibility() {
+    const v = parseInt(checkerVis.value, 10); // 0 = onzichtbaar, 100 = duidelijk zichtbaar
+    checkerVisVal.textContent = v;
+    const gray = Math.round(255 - (v / 100) * 204); // 255 (blendt weg in wit) .. 51 (donker, goed zichtbaar)
+    document.documentElement.style.setProperty('--checker', `rgb(${gray},${gray},${gray})`);
+  }
+  checkerVis.addEventListener('input', applyCheckerVisibility);
+  applyCheckerVisibility();
+
+  let originalImageData = null; // ImageData at working resolution
+
+  Object.keys(controls).forEach(key => {
+    controls[key].addEventListener('input', () => {
+      setLabelValue(key, controls[key].value);
+      scheduleProcess();
+    });
+  });
+
+  // Rasterhoek: laat de schuif en het typveld elkaar synchroniseren.
+  labels.angle.addEventListener('input', () => {
+    const v = parseFloat(labels.angle.value);
+    if (Number.isNaN(v)) return;
+    controls.angle.value = v; // de range clamt automatisch naar 0..180
+    scheduleProcess();
+  });
+  labels.angle.addEventListener('blur', () => {
+    labels.angle.value = controls.angle.value; // netjes terugklemmen naar geldige waarde
+  });
+
+  bwToggle.addEventListener('change', () => {
+    bwFieldset.disabled = !bwToggle.checked;
+    posterFieldset.disabled = !bwToggle.checked;
+    scheduleProcess();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    Object.keys(defaults).forEach(key => {
+      controls[key].value = defaults[key];
+      setLabelValue(key, defaults[key]);
+    });
+    scheduleProcess();
+  });
+
+  // --- Presets (opgeslagen in localStorage, blijven bewaard tussen sessies) ---
+  const PRESET_KEY = 'zeefdrukPresets_v1';
+  const presetSelect = document.getElementById('presetSelect');
+  const presetNameInput = document.getElementById('presetName');
+  const savePresetBtn = document.getElementById('savePresetBtn');
+  const deletePresetBtn = document.getElementById('deletePresetBtn');
+
+  function loadPresets() {
+    try {
+      return JSON.parse(localStorage.getItem(PRESET_KEY) || '{}');
+    } catch (e) {
+      return {};
+    }
+  }
+  function savePresets(presets) {
+    localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  }
+  function refreshPresetSelect(selectName) {
+    const presets = loadPresets();
+    presetSelect.innerHTML = '<option value="">&mdash; Kies preset &mdash;</option>';
+    Object.keys(presets).sort((a, b) => a.localeCompare(b)).forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      presetSelect.appendChild(opt);
+    });
+    presetSelect.value = (selectName && presets[selectName]) ? selectName : '';
+    deletePresetBtn.disabled = !presetSelect.value;
+  }
+  function currentSettings() {
+    return {
+      bw: bwToggle.checked,
+      brightness: controls.brightness.value,
+      contrast: controls.contrast.value,
+      threshold: controls.threshold.value,
+      levels: controls.levels.value,
+      dotSize: controls.dotSize.value,
+      angle: controls.angle.value,
+      sharpDots: sharpDots.checked,
+    };
+  }
+  function applySettings(s) {
+    bwToggle.checked = !!s.bw;
+    bwFieldset.disabled = !bwToggle.checked;
+    posterFieldset.disabled = !bwToggle.checked;
+    ['brightness', 'contrast', 'threshold', 'levels', 'dotSize', 'angle'].forEach(key => {
+      if (s[key] !== undefined) {
+        controls[key].value = s[key];
+        setLabelValue(key, s[key]);
+      }
+    });
+    sharpDots.checked = !!s.sharpDots;
+    scheduleProcess();
+  }
+
+  savePresetBtn.addEventListener('click', () => {
+    const name = presetNameInput.value.trim();
+    if (!name) {
+      presetNameInput.focus();
+      return;
+    }
+    const presets = loadPresets();
+    if (presets[name] && !confirm(`Preset "${name}" bestaat al. Overschrijven?`)) {
+      return;
+    }
+    presets[name] = currentSettings();
+    savePresets(presets);
+    refreshPresetSelect(name);
+    presetNameInput.value = '';
+  });
+
+  presetSelect.addEventListener('change', () => {
+    deletePresetBtn.disabled = !presetSelect.value;
+    if (!presetSelect.value) return;
+    const presets = loadPresets();
+    const s = presets[presetSelect.value];
+    if (s) applySettings(s);
+  });
+
+  deletePresetBtn.addEventListener('click', () => {
+    if (!presetSelect.value) return;
+    if (!confirm(`Preset "${presetSelect.value}" verwijderen?`)) return;
+    const presets = loadPresets();
+    delete presets[presetSelect.value];
+    savePresets(presets);
+    refreshPresetSelect();
+  });
+
+  refreshPresetSelect();
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) loadImageFile(e.target.files[0]);
+  });
+  ['dragover','dragenter'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); })
+  );
+  ['dragleave','drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file) loadImageFile(file);
+  });
+
+  function loadImageFile(file) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const scale = Math.min(1, MAX_DIM / Math.max(w, h));
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+
+      originalCanvas.width = w;
+      originalCanvas.height = h;
+      const octx = originalCanvas.getContext('2d');
+      octx.drawImage(img, 0, 0, w, h);
+      originalImageData = octx.getImageData(0, 0, w, h);
+      originalEmpty.style.display = 'none';
+      resultEmpty.style.display = 'none';
+
+      resultCanvas.width = w;
+      resultCanvas.height = h;
+
+      bwFieldset.disabled = !bwToggle.checked;
+      posterFieldset.disabled = !bwToggle.checked;
+      downloadBtn.disabled = false;
+      resetBtn.disabled = false;
+
+      URL.revokeObjectURL(url);
+      process();
+    };
+    img.src = url;
+  }
+
+  let rafHandle = null;
+  function scheduleProcess() {
+    if (rafHandle) cancelAnimationFrame(rafHandle);
+    rafHandle = requestAnimationFrame(process);
+  }
+
+  function process() {
+    if (!originalImageData) return;
+    const w = originalImageData.width, h = originalImageData.height;
+    const rctx = resultCanvas.getContext('2d');
+
+    if (!bwToggle.checked) {
+      rctx.clearRect(0, 0, w, h);
+      rctx.putImageData(originalImageData, 0, 0);
+      return;
+    }
+
+    const brightness = parseFloat(controls.brightness.value);
+    const contrastRaw = parseFloat(controls.contrast.value);
+    const threshold = parseFloat(controls.threshold.value);
+    const levels = parseInt(controls.levels.value, 10);
+    const dotSize = parseInt(controls.dotSize.value, 10);
+    const angleDeg = parseFloat(controls.angle.value);
+
+    const c = contrastRaw * 2.55; // map -100..100 to -255..255
+    const contrastFactor = (259 * (c + 255)) / (255 * (259 - c));
+
+    const src = originalImageData.data;
+    const gray = new Float32Array(w * h);
+    const step = 255 / (levels - 1);
+    for (let i = 0, p = 0; i < src.length; i += 4, p++) {
+      let v = 0.299 * src[i] + 0.587 * src[i+1] + 0.114 * src[i+2];
+      v += brightness * 1.5;
+      v = contrastFactor * (v - 128) + 128;
+      if (v <= threshold) {
+        v = 0;
+      } else {
+        v = (v - threshold) / (255 - threshold) * 255;
+      }
+      v = Math.max(0, Math.min(255, v));
+      v = Math.round(v / step) * step; // posterize
+      gray[p] = v;
+    }
+
+    rctx.clearRect(0, 0, w, h);
+    const maxRadius = dotSize / 2 * 0.95;
+    const sharp = sharpDots.checked;
+    const out = sharp ? new Uint8ClampedArray(w * h * 4) : null; // all zero = transparent
+    if (!sharp) rctx.fillStyle = '#000';
+
+    // Rasterhoek: het dotraster wordt bemonsterd in een geroteerd (u,v) assenstelsel
+    // rond het midden van de afbeelding, en teruggerekend naar beeldcoördinaten.
+    const theta = angleDeg * Math.PI / 180;
+    const cosT = Math.cos(theta), sinT = Math.sin(theta);
+    const cxImg = w / 2, cyImg = h / 2;
+    const halfCell = dotSize / 2;
+    const gridRange = Math.ceil(Math.sqrt(cxImg * cxImg + cyImg * cyImg) / dotSize) + 1;
+
+    for (let j = -gridRange; j <= gridRange; j++) {
+      for (let i = -gridRange; i <= gridRange; i++) {
+        const u = i * dotSize;
+        const v = j * dotSize;
+        const cx = cxImg + u * cosT - v * sinT;
+        const cy = cyImg + u * sinT + v * cosT;
+        if (cx < -halfCell || cx > w + halfCell || cy < -halfCell || cy > h + halfCell) continue;
+
+        const x0s = Math.max(0, Math.floor(cx - halfCell));
+        const x1s = Math.min(w - 1, Math.floor(cx + halfCell - 1e-6));
+        const y0s = Math.max(0, Math.floor(cy - halfCell));
+        const y1s = Math.min(h - 1, Math.floor(cy + halfCell - 1e-6));
+        if (x1s < x0s || y1s < y0s) continue;
+
+        let sum = 0, count = 0;
+        for (let yy = y0s; yy <= y1s; yy++) {
+          for (let xx = x0s; xx <= x1s; xx++) {
+            sum += gray[yy * w + xx];
+            count++;
+          }
+        }
+        const avg = sum / count;
+        const darkness = 1 - avg / 255;
+        if (darkness <= 0.02) continue;
+        const r = Math.sqrt(darkness) * maxRadius;
+
+        if (sharp) {
+          // Teken elke pixel binnen de straal volledig ondoorzichtig zwart, geen antialiasing.
+          const r2 = r * r;
+          const x0 = Math.max(0, Math.floor(cx - r));
+          const x1 = Math.min(w - 1, Math.ceil(cx + r));
+          const y0 = Math.max(0, Math.floor(cy - r));
+          const y1 = Math.min(h - 1, Math.ceil(cy + r));
+          for (let yy = y0; yy <= y1; yy++) {
+            const dy = yy + 0.5 - cy;
+            for (let xx = x0; xx <= x1; xx++) {
+              const dx = xx + 0.5 - cx;
+              if (dx * dx + dy * dy <= r2) {
+                const idx = (yy * w + xx) * 4;
+                out[idx] = 0; out[idx + 1] = 0; out[idx + 2] = 0; out[idx + 3] = 255;
+              }
+            }
+          }
+        } else {
+          rctx.beginPath();
+          rctx.arc(cx, cy, r, 0, Math.PI * 2);
+          rctx.fill();
+        }
+      }
+    }
+
+    if (sharp) {
+      rctx.putImageData(new ImageData(out, w, h), 0, 0);
+    }
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    resultCanvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'zeefdruk-ontwerp.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+})();
+</script>
+</body>
+</html>
